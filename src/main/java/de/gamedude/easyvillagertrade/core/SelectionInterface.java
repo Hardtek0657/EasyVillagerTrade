@@ -1,0 +1,98 @@
+package de.gamedude.easyvillagertrade.core;
+
+import de.gamedude.easyvillagertrade.utils.TradingState;
+import java.util.Optional;
+import net.minecraft.block.LecternBlock;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.village.VillagerProfession;
+import net.minecraft.world.World;
+
+public class SelectionInterface {
+
+    private final EasyVillagerTradeBase modBase;
+    private VillagerEntity villager;
+    private BlockPos lecternPos;
+
+    public SelectionInterface(EasyVillagerTradeBase modBase) {
+        this.modBase = modBase;
+    }
+
+    public VillagerEntity getVillager() {
+        return villager;
+    }
+
+    public void setVillager(VillagerEntity villager) {
+        this.villager = villager;
+    }
+
+    public BlockPos getLecternPos() {
+        return lecternPos;
+    }
+
+    public void setLecternPos(BlockPos blockPos) {
+        this.lecternPos = blockPos;
+    }
+
+    public int selectClosestToPlayer(ClientPlayerEntity player) {
+        Optional<BlockPos> closestBlockOptional = BlockPos.findClosest(
+            player.getBlockPos(),
+            3,
+            0,
+            blockPos ->
+                player.getWorld().getBlockState(blockPos).getBlock() instanceof
+                LecternBlock
+        );
+
+        // Updated Optional check
+        if (!closestBlockOptional.isPresent()) {
+            modBase.setState(TradingState.INACTIVE);
+            return 1;
+        }
+        this.lecternPos = closestBlockOptional.get();
+
+        this.villager = getClosestEntity(player.getWorld(), this.lecternPos);
+        if (this.villager == null) {
+            modBase.setState(TradingState.INACTIVE);
+            return 2;
+        }
+        modBase.setState(TradingState.INACTIVE);
+        return 0;
+    }
+
+    private VillagerEntity getClosestEntity(World world, BlockPos blockPos) {
+        VillagerEntity entity = null;
+        double dist = Double.MAX_VALUE;
+
+        for (VillagerEntity villagerEntity : world.getEntitiesByClass(
+            VillagerEntity.class,
+            new Box(blockPos).expand(3),
+            villager ->
+                villager.getVillagerData().getProfession() ==
+                VillagerProfession.LIBRARIAN
+        )) {
+            double distanceSquared = villagerEntity.squaredDistanceTo(
+                blockPos.getX(),
+                blockPos.getY(),
+                blockPos.getZ()
+            );
+            if (distanceSquared < dist) {
+                dist = distanceSquared;
+                entity = villagerEntity;
+            }
+        }
+        return entity;
+    }
+
+    public boolean isVillagerSleeping() {
+        if (villager == null) {
+            modBase.setVillagerSleeping(false);
+            return false;
+        }
+        boolean sleeping = villager.isSleeping();
+        modBase.setVillagerSleeping(sleeping);
+        return sleeping;
+    }
+}
